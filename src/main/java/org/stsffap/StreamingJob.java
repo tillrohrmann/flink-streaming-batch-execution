@@ -19,15 +19,21 @@
 package org.stsffap;
 
 import org.apache.flink.api.common.RuntimeExecutionMode;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.serialization.SimpleStringEncoder;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ExecutionOptions;
+import org.apache.flink.connector.file.sink.FileSink;
+import org.apache.flink.connector.file.src.FileSource;
+import org.apache.flink.connector.file.src.reader.TextLineFormat;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -57,8 +63,14 @@ public class StreamingJob {
 
 		env.setParallelism(10);
 
-		final String inputFilename = parameterTool.get("input", "input");
-		final DataStream<String> input = env.readTextFile(inputFilename);
+		final String inputFilename = parameterTool.get("input", "test-input/input");
+		final String outputFilename = parameterTool.get("output", "test-output");
+		final FileSource<String> source = FileSource
+				.forRecordStreamFormat(new TextLineFormat(), new Path(inputFilename))
+				.build();
+
+		final DataStream<String> input = env.fromSource(source, WatermarkStrategy.noWatermarks(), "foobar");
+
 		final DataStream<String> words = input.flatMap((FlatMapFunction<String, String>) (s, collector) -> {
 			for (String split : s.split(" ")) {
 				collector.collect(split.trim());
@@ -73,7 +85,10 @@ public class StreamingJob {
 				.keyBy(t -> t.f0)
 				.reduce((ReduceFunction<Tuple2<String, Integer>>) (stringIntegerPair, t1) -> Tuple2.of(stringIntegerPair.f0, stringIntegerPair.f1 + t1.f1));
 
-		wordsWithCounts.addSink(new PrintSinkFunction<>());
+		final FileSink<Tuple2<String, Integer>> sink = FileSink.<Tuple2<String, Integer>>forRowFormat(new Path(outputFilename), new SimpleStringEncoder<>())
+				.build();
+
+		wordsWithCounts.sinkTo(sink);
 
 		// execute program
 		env.execute("Flink Batch streaming job");
