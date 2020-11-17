@@ -2,6 +2,7 @@
 .idea
 target
 test-input
+test-output
 # Compiled class file
 *.class
 

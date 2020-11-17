@@ -38,6 +38,8 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.PrintSinkFunction;
+import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
+import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.DateTimeBucketAssigner;
 
 /**
  * Skeleton for a Flink Streaming Job.
@@ -86,6 +88,7 @@ public class StreamingJob {
 				.reduce((ReduceFunction<Tuple2<String, Integer>>) (stringIntegerPair, t1) -> Tuple2.of(stringIntegerPair.f0, stringIntegerPair.f1 + t1.f1));
 
 		final FileSink<Tuple2<String, Integer>> sink = FileSink.<Tuple2<String, Integer>>forRowFormat(new Path(outputFilename), new SimpleStringEncoder<>())
+				.withBucketAssigner(new DateTimeBucketAssigner<>())
 				.build();
 
 		wordsWithCounts.sinkTo(sink);
