@@ -70,7 +70,7 @@ public class StreamingJob {
 		final Configuration conf = new Configuration();
 		conf.setInteger(RestOptions.PORT, 8081);
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
-		env.setParallelism(5);
+		env.setParallelism(10);
 		final Configuration configuration = new Configuration();
 		configuration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.valueOf(parameterTool.get("mode", "STREAMING")));
 		env.configure(configuration, StreamingJob.class.getClassLoader());
@@ -111,7 +111,7 @@ public class StreamingJob {
 			}
 		});
 
-		final IterativeStream<DataObject> iterate = process.iterate();
+		final IterativeStream<DataObject> iterate = process.iterate(10L);
 
 		final OutputTag<DataObject> sideOutputTag = new OutputTag<DataObject>("sideOutput") {};
 		final SingleOutputStreamOperator<DataObject> iterationStep = iterate.map(x -> x);
