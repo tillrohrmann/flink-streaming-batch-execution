@@ -70,7 +70,10 @@ public class StreamingJob {
 		final Configuration conf = new Configuration();
 		conf.setInteger(RestOptions.PORT, 8081);
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
-		env.setParallelism(10);
+		// terminates
+		env.setParallelism(4);
+		// does not terminate
+		// env.setParallelism(6);
 		final Configuration configuration = new Configuration();
 		configuration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.valueOf(parameterTool.get("mode", "STREAMING")));
 		env.configure(configuration, StreamingJob.class.getClassLoader());
