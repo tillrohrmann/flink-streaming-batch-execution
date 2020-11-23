@@ -1,7 +1,7 @@
 *.iml
 .idea
 target
-test-input
+# test-input
 test-output
 # Compiled class file
 *.class
