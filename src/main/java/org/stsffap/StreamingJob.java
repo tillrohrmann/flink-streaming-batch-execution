@@ -22,6 +22,8 @@ import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringEncoder;
+import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.utils.ParameterTool;
@@ -36,11 +38,14 @@ import org.apache.flink.connector.file.src.reader.StreamFormat;
 import org.apache.flink.connector.file.src.reader.TextLineFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.streaming.api.datastream.BroadcastStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.streaming.api.functions.co.BroadcastProcessFunction;
 import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.DateTimeBucketAssigner;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
@@ -75,7 +80,7 @@ public class StreamingJob {
 		// does not terminate
 		// env.setParallelism(6);
 		final Configuration configuration = new Configuration();
-		configuration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.valueOf(parameterTool.get("mode", "STREAMING")));
+		configuration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.valueOf(parameterTool.get("mode", "BATCH")));
 		env.configure(configuration, StreamingJob.class.getClassLoader());
 
 		final String inputFilename = parameterTool.get("input", "test-input/input");
@@ -114,19 +119,32 @@ public class StreamingJob {
 			}
 		});
 
-		final IterativeStream<DataObject> iterate = process.iterate(10L);
+		final DataStreamSource<Integer> rules = env.fromElements(1, 2, 3, 4, 5, 6);
+		final MapStateDescriptor<String, Integer> mapStateDescriptor = new MapStateDescriptor<String, Integer>(
+				"mapStateDescriptor",
+				BasicTypeInfo.STRING_TYPE_INFO,
+				BasicTypeInfo.INT_TYPE_INFO);
 
-		final OutputTag<DataObject> sideOutputTag = new OutputTag<DataObject>("sideOutput") {};
-		final SingleOutputStreamOperator<DataObject> iterationStep = iterate.map(x -> x);
-		final DataStream<DataObject> sideOutput = iterationStep.getSideOutput(sideOutputTag);
+		final BroadcastStream<Integer> broadcastStream = rules.broadcast(mapStateDescriptor);
 
-		iterate.closeWith(iterationStep);
+		final SingleOutputStreamOperator<DataObject> broadcastOutput = process.connect(broadcastStream).process(new BroadcastProcessFunction<DataObject, Integer, DataObject>() {
+			@Override
+			public void processElement(DataObject value, ReadOnlyContext ctx, Collector<DataObject> out) throws Exception {
+				out.collect(value);
+			}
+
+			@Override
+			public void processBroadcastElement(Integer value, Context ctx, Collector<DataObject> out) throws Exception {
+				out.collect(new DataObject("broadcast", value, value));
+			}
+		});
+
 
 		final FileSink<DataObject> sink = FileSink.<DataObject>forRowFormat(new Path(outputFilename), new SimpleStringEncoder<>())
 				.withBucketAssigner(new DateTimeBucketAssigner<>())
 				.build();
 
-		sideOutput.sinkTo(sink);
+		broadcastOutput.sinkTo(sink);
 
 		// execute program
 		env.execute("Flink Batch streaming job");

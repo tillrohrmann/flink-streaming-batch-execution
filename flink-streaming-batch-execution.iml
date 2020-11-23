@@ -15,6 +15,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Maven: org.apache.flink:flink-runtime-web_2.11:1.12-SNAPSHOT" level="project" />
     <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.flink:flink-java:1.12-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.apache.flink:flink-core:1.12-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.apache.flink:flink-annotations:1.12-SNAPSHOT" level="project" />
